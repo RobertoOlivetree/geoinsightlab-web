@@ -69,7 +69,8 @@ def load_data() -> pd.DataFrame:
     missing = sorted(REQUIRED_COLUMNS.difference(dataframe.columns))
     if missing:
         raise ValueError(
-            "The dataset does not contain all required columns: " + ", ".join(missing)
+            "The dataset does not contain all required columns: "
+            + ", ".join(missing)
         )
 
     return dataframe
@@ -77,6 +78,7 @@ def load_data() -> pd.DataFrame:
 
 def numeric_columns(dataframe: pd.DataFrame) -> list[str]:
     excluded = {"latitude", "longitude"}
+
     return [
         column
         for column in dataframe.select_dtypes(include="number").columns.tolist()
@@ -97,4 +99,7 @@ def filter_by_parish(
 
 
 def column_label(column: str) -> str:
-    return COLUMN_LABELS.get(column, column.replace("_", " ").title())
+    return COLUMN_LABELS.get(
+        column,
+        column.replace("_", " ").title(),
+    )
