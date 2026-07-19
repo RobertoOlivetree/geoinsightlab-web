@@ -1,0 +1,318 @@
+from __future__ import annotations
+
+import json
+from typing import Any
+
+import pandas as pd
+import pydeck as pdk
+import streamlit as st
+from shapely import wkt
+from shapely.geometry import mapping
+from shapely.validation import make_valid
+
+from utils.data_loader import column_label
+
+
+DEFAULT_POLYGON_COLOUR = [128, 128, 128, 175]
+
+
+def _rgba_to_css(colour: list[int]) -> str:
+    red, green, blue, *alpha = colour
+    opacity = (alpha[0] / 255) if alpha else 1.0
+    return f"rgba({red}, {green}, {blue}, {opacity:.3f})"
+
+
+def _continuous_colour(value: float) -> list[int]:
+    value = max(0.0, min(1.0, float(value)))
+    return [
+        int(40 + 205 * value),
+        int(165 - 95 * value),
+        int(215 - 120 * value),
+        190,
+    ]
+
+
+def _valid_geometry(geometry_text: Any):
+    if not isinstance(geometry_text, str) or not geometry_text.strip():
+        return None
+
+    try:
+        geometry = wkt.loads(geometry_text)
+    except Exception:
+        return None
+
+    if geometry.is_empty:
+        return None
+
+    if not geometry.is_valid:
+        try:
+            geometry = make_valid(geometry)
+        except Exception:
+            geometry = geometry.buffer(0)
+
+    if geometry.is_empty or geometry.geom_type not in {"Polygon", "MultiPolygon"}:
+        return None
+
+    return geometry
+
+
+@st.cache_data(show_spinner=False)
+def _build_geojson(
+    dataframe: pd.DataFrame,
+    property_columns: tuple[str, ...],
+    colour_column: str,
+) -> dict:
+    features = []
+
+    selected_columns = list(
+        dict.fromkeys(["geometry_wkt", *property_columns, colour_column])
+    )
+    working = dataframe[selected_columns]
+
+    for row in working.itertuples(index=False, name=None):
+        row_data = dict(zip(selected_columns, row))
+        geometry = _valid_geometry(row_data.pop("geometry_wkt", None))
+        if geometry is None:
+            continue
+
+        properties = {
+            key: (
+                value.item()
+                if hasattr(value, "item")
+                else value
+            )
+            for key, value in row_data.items()
+        }
+
+        # GeoJSON and PyDeck cannot serialise NaN/NA values reliably.
+        for key, value in list(properties.items()):
+            if pd.isna(value):
+                properties[key] = None
+
+        features.append(
+            {
+                "type": "Feature",
+                "geometry": mapping(geometry),
+                "properties": properties,
+            }
+        )
+
+    return {"type": "FeatureCollection", "features": features}
+
+
+def _sample_for_map(
+    dataframe: pd.DataFrame,
+    maximum_polygons: int,
+) -> tuple[pd.DataFrame, bool]:
+    if len(dataframe) <= maximum_polygons:
+        return dataframe.copy(), False
+
+    return (
+        dataframe.sample(maximum_polygons, random_state=42).copy(),
+        True,
+    )
+
+
+def _view_state(dataframe: pd.DataFrame) -> pdk.ViewState:
+    coordinates = dataframe.dropna(subset=["latitude", "longitude"])
+
+    if coordinates.empty:
+        return pdk.ViewState(latitude=41.1579, longitude=-8.6291, zoom=11)
+
+    return pdk.ViewState(
+        latitude=float(coordinates["latitude"].mean()),
+        longitude=float(coordinates["longitude"].mean()),
+        zoom=11.2,
+        pitch=0,
+    )
+
+
+def _render_geojson_layer(
+    geojson: dict,
+    dataframe: pd.DataFrame,
+    tooltip: dict,
+) -> None:
+    if not geojson["features"]:
+        st.info(
+            "No valid Polygon or MultiPolygon building geometries are available "
+            "for the current selection."
+        )
+        return
+
+    layer = pdk.Layer(
+        "GeoJsonLayer",
+        data=geojson,
+        pickable=True,
+        auto_highlight=True,
+        filled=True,
+        stroked=True,
+        get_fill_color="properties._fill_colour",
+        get_line_color=[28, 35, 45, 150],
+        get_line_width=1,
+        line_width_min_pixels=0.25,
+        line_width_max_pixels=1.25,
+        highlight_color=[255, 255, 255, 150],
+    )
+
+    deck = pdk.Deck(
+        layers=[layer],
+        initial_view_state=_view_state(dataframe),
+        tooltip=tooltip,
+        map_style=None,
+    )
+
+    st.pydeck_chart(deck, use_container_width=True)
+
+
+def render_continuous_polygon_map(
+    dataframe: pd.DataFrame,
+    value_column: str,
+    maximum_polygons: int,
+) -> None:
+    required = {
+        "geometry_wkt",
+        "latitude",
+        "longitude",
+        "osm_id",
+        "designacao_simplificada",
+        "numero_servicos_proximos",
+        "distancia_media_servicos",
+        value_column,
+    }
+    missing = sorted(required.difference(dataframe.columns))
+    if missing:
+        st.error("Missing map columns: " + ", ".join(missing))
+        return
+
+    map_data = dataframe.dropna(subset=["geometry_wkt", value_column]).copy()
+    if map_data.empty:
+        st.info("No observations are available for mapping.")
+        return
+
+    map_data, sampled = _sample_for_map(map_data, maximum_polygons)
+
+    values = pd.to_numeric(map_data[value_column], errors="coerce")
+    minimum = float(values.quantile(0.02))
+    maximum = float(values.quantile(0.98))
+    interval = max(maximum - minimum, 1e-9)
+
+    normalised = ((values - minimum) / interval).clip(0, 1).fillna(0.5)
+    map_data["_fill_colour"] = normalised.apply(_continuous_colour)
+
+    properties = (
+        "osm_id",
+        "designacao_simplificada",
+        value_column,
+        "numero_servicos_proximos",
+        "distancia_media_servicos",
+        "_fill_colour",
+    )
+    geojson = _build_geojson(map_data, properties, "_fill_colour")
+    value_label = column_label(value_column)
+
+    if sampled:
+        st.caption(
+            f"The map displays a reproducible sample of {len(map_data):,} real "
+            "building footprints. All statistics use the complete filtered dataset."
+        )
+    else:
+        st.caption(
+            f"The map displays all {len(map_data):,} real building footprints "
+            "available in the current selection."
+        )
+
+    st.caption(
+        f"Colour range: {minimum:,.2f} to {maximum:,.2f} "
+        "(2nd–98th percentiles)."
+    )
+
+    tooltip = {
+        "html": (
+            "<b>OSM ID:</b> {osm_id}<br/>"
+            "<b>Parish:</b> {designacao_simplificada}<br/>"
+            f"<b>{value_label}:</b> {{{value_column}}}<br/>"
+            "<b>Nearby services:</b> {numero_servicos_proximos}<br/>"
+            "<b>Mean distance:</b> {distancia_media_servicos} m"
+        )
+    }
+
+    _render_geojson_layer(geojson, map_data, tooltip)
+
+
+def render_categorical_polygon_map(
+    dataframe: pd.DataFrame,
+    category_column: str,
+    colour_map: dict[str, list[int]],
+    maximum_polygons: int,
+    category_prefix: str = "Cluster",
+) -> None:
+    required = {
+        "geometry_wkt",
+        "latitude",
+        "longitude",
+        "osm_id",
+        "designacao_simplificada",
+        "numero_servicos_proximos",
+        "distancia_media_servicos",
+        category_column,
+    }
+    missing = sorted(required.difference(dataframe.columns))
+    if missing:
+        st.error("Missing map columns: " + ", ".join(missing))
+        return
+
+    map_data = dataframe.dropna(subset=["geometry_wkt", category_column]).copy()
+    if map_data.empty:
+        st.info("No observations are available for mapping.")
+        return
+
+    map_data, sampled = _sample_for_map(map_data, maximum_polygons)
+    map_data["_category_label"] = map_data[category_column].map(
+        lambda value: f"{category_prefix} {int(value)}"
+    )
+    map_data["_fill_colour"] = map_data["_category_label"].map(
+        lambda label: colour_map.get(label, DEFAULT_POLYGON_COLOUR)
+    )
+
+    properties = (
+        "osm_id",
+        "designacao_simplificada",
+        "numero_servicos_proximos",
+        "distancia_media_servicos",
+        "_category_label",
+        "_fill_colour",
+    )
+    geojson = _build_geojson(map_data, properties, "_fill_colour")
+
+    if sampled:
+        st.caption(
+            f"The map displays a reproducible sample of {len(map_data):,} real "
+            "building footprints. Cluster statistics use the complete filtered dataset."
+        )
+    else:
+        st.caption(
+            f"The map displays all {len(map_data):,} real building footprints "
+            "available in the current selection."
+        )
+
+    legend_items = " &nbsp; ".join(
+        (
+            f'<span style="display:inline-block;width:12px;height:12px;'
+            f'border-radius:2px;background:{_rgba_to_css(colour)};'
+            f'margin-right:5px;"></span>{label}'
+        )
+        for label, colour in colour_map.items()
+    )
+    st.markdown(legend_items, unsafe_allow_html=True)
+
+    tooltip = {
+        "html": (
+            "<b>OSM ID:</b> {osm_id}<br/>"
+            "<b>Parish:</b> {designacao_simplificada}<br/>"
+            "<b>Cluster:</b> {_category_label}<br/>"
+            "<b>Nearby services:</b> {numero_servicos_proximos}<br/>"
+            "<b>Mean distance:</b> {distancia_media_servicos} m"
+        )
+    }
+
+    _render_geojson_layer(geojson, map_data, tooltip)
