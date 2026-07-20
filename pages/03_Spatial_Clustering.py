@@ -194,11 +194,7 @@ map_tab, profiles_tab, pca_tab, comparison_tab, methodology_tab = st.tabs(
 )
 
 with map_tab:
-    st.subheader(f"{selected_method} spatial distribution")
-    st.caption(
-        "Clusters are represented through the real Polygon or MultiPolygon building "
-        "footprints stored in geometry_wkt. Artificial point or geometric proxies are not used."
-    )
+    st.subheader(f"{selected_method} Spatial Distribution")
     render_cluster_map(filtered, cluster_column, maximum_points)
 
     distribution = summary[["Cluster", "Buildings", "Share (%)"]].copy()
