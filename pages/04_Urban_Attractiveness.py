@@ -16,9 +16,9 @@ page_header(
 )
 
 scientific_note(
-    "This module implements the thesis workflow for the Urban Attractiveness Index: "
-    "winsorisation at the 1st and 99th percentiles, z-score standardisation, "
-    "one-component PCA oriented towards supermarkets, and rescaling to [0, 1]."
+    "The Urban Attractiveness Index combines multiple accessibility indicators "
+    "using Principal Component Analysis (PCA) to characterise the spatial "
+    "distribution of urban attractiveness across Porto."
 )
 
 
