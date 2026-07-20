@@ -19,5 +19,4 @@ libpysal>=4.12,<5
 esda>=2.7,<3
 
 xgboost>=2.1,<4
-shap>=0.46,<1
 lime>=0.2.0.1
