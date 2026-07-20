@@ -259,7 +259,7 @@ with map_tab:
     st.caption(
         "Access indicates that at least one establishment of the selected service is "
         "available within the 1.5 km pedestrian-network threshold. No access identifies "
-        "a coverage gap. Real Polygon or MultiPolygon building footprints are used."
+        "a coverage gap."
     )
 
     render_access_map(
