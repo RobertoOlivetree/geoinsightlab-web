@@ -14,7 +14,7 @@ from utils.theme import apply_theme, page_header, scientific_note
 apply_theme()
 page_header(
     "Data Exploration",
-    "Interactive statistical and spatial exploration of the Porto building-level dataset.",
+    "Explore building-level spatial data through interactive visualisation, statistical analysis and mapping.",
 )
 
 dataframe = load_data()
