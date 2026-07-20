@@ -16,9 +16,9 @@ page_header(
 )
 
 scientific_note(
-    "This module visualises clustering results already stored in the research dataset. "
-    "It does not retrain the algorithms during each session, which preserves reproducibility "
-    "and ensures efficient performance on Streamlit Community Cloud."
+    "This module explores the spatial patterns identified through unsupervised "
+    "applied to the Porto building-level dataset, supporting the identification "
+    "of distinct urban spatial profiles."
 )
 
 CLUSTER_METHODS = {
