@@ -18,9 +18,10 @@ page_header(
     "Explore pedestrian access to essential urban services within the 1.5 km network threshold adopted in the doctoral research.",
 )
 scientific_note(
-    "This module uses the service-access indicators already stored in the research dataset. "
-    "A building is considered covered when at least one establishment of the selected service category is "
-    "available within the 1.5 km pedestrian-network threshold."
+    "This module evaluates pedestrian accessibility to essential urban services using "
+    "the service-access indicators derived from the research dataset. A building is"
+    "considered covered when at least one establishment of the selected service "
+    "category is reachable within the 1.5 km pedestrian-network threshold."
 )
 
 SERVICE_COLUMNS = {
