@@ -1,13 +1,23 @@
 streamlit>=1.46,<2
 pandas>=2.2,<3
+numpy>=1.26,<3
 pyarrow>=17,<22
+
 plotly>=5.24,<7
 pydeck>=0.9,<1
-shapely>=2.0,<3
 
-numpy>=1.26,<3
+shapely>=2.0,<3
+geopandas>=1.0,<2
+fiona>=1.10,<2
+pyproj>=3.7,<4
+
+scipy>=1.13,<2
 scikit-learn>=1.5,<2
 joblib>=1.4,<2
-lime>=0.2.0.1
-shap>=0.46,<1
+
+libpysal>=4.12,<5
+esda>=2.7,<3
+
 xgboost>=2.1,<4
+shap>=0.46,<1
+lime>=0.2.0.1
