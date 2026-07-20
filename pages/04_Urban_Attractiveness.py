@@ -597,7 +597,7 @@ metric_columns[3].metric(
 
 with map_tab:
     st.subheader(
-        f"{formulation} spatial distribution"
+        f"{formulation} Urban Attractiveness Map"
     )
 
     render_continuous_polygon_map(
