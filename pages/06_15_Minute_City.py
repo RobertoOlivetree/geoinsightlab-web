@@ -15,7 +15,7 @@ from utils.theme import apply_theme, page_header, scientific_note
 apply_theme()
 page_header(
     "15-Minute City",
-    "Assess which buildings have pedestrian access to essential urban services within the 1.5 km network threshold used in the thesis.",
+    "Explore pedestrian access to essential urban services within the 1.5 km network threshold adopted in the doctoral research.",
 )
 scientific_note(
     "This module uses the service-access indicators already stored in the research dataset. "
