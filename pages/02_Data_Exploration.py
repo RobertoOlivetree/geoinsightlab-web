@@ -77,10 +77,7 @@ map_tab, distribution_tab, relationships_tab, table_tab = st.tabs(
 
 with map_tab:
     st.subheader("Interactive building-footprint map")
-    st.caption(
-        "Each mapped feature is the real Polygon or MultiPolygon stored in geometry_wkt. "
-        "No circles, squares or other artificial proxy geometries are generated."
-    )
+    
     render_continuous_polygon_map(
         filtered,
         value_column=selected_variable,
